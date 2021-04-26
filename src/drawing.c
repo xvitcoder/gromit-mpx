@@ -44,7 +44,6 @@ void draw_line (GromitData *data,
   data->painted = 1;
 }
 
-
 void draw_arrow (GromitData *data, 
 		 GdkDevice *dev,
 		 gint x1, gint y1,

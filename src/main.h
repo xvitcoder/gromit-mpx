@@ -57,11 +57,13 @@
 #define GA_DATA       gdk_atom_intern ("Gromit/data", FALSE)
 #define GA_TOGGLEDATA gdk_atom_intern ("Gromit/toggledata", FALSE)
 
-#define GROMIT_MAX_UNDO 4
+#define GROMIT_MAX_UNDO 100
 
 typedef enum
 {
   GROMIT_PEN,
+  GROMIT_LINE,
+  GROMIT_RECTANGLE,
   GROMIT_ERASER,
   GROMIT_RECOLOR
 } GromitPaintType;
@@ -80,6 +82,8 @@ typedef struct
 
 typedef struct
 {
+  gint         start_x;
+  gint         start_y;
   gdouble      lastx;
   gdouble      lasty;
   guint32      motion_time;
