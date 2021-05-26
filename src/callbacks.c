@@ -300,6 +300,11 @@ gboolean on_motion (GtkWidget *win,
     /* get the data for this device */
     GromitDeviceData *devdata = g_hash_table_lookup(data->devdatatable, ev->device);
 
+    if (devdata->cur_context->type == GROMIT_LINE || 
+            devdata->cur_context->type == GROMIT_RECTANGLE) {
+        undo_drawing (data);
+    }
+
     if (!devdata->is_grabbed)
         return FALSE;
 
@@ -322,6 +327,7 @@ gboolean on_motion (GtkWidget *win,
 
             gdk_device_get_axis (ev->device, coords[i]->axes,
                     GDK_AXIS_PRESSURE, &pressure);
+
             if (pressure > 0)
             {
                 data->maxwidth = (CLAMP (pressure + line_thickener, 0, 1) *
@@ -354,6 +360,7 @@ gboolean on_motion (GtkWidget *win,
 
     if (pressure > 0)
     {
+
         data->maxwidth = (CLAMP (pressure + line_thickener, 0, 1) *
                 (double) (devdata->cur_context->width -
                     devdata->cur_context->minwidth) +
@@ -364,10 +371,18 @@ gboolean on_motion (GtkWidget *win,
 
         if(devdata->motion_time > 0)
         {
+
             if (devdata->cur_context->type == GROMIT_LINE) {
-                /* draw_line (data, ev->device, devdata->start_x, devdata->start_y, ev->x, ev->y); */
+                // ADDED
+                snap_undo_state (data);
+                draw_line (data, ev->device, devdata->start_x, devdata->start_y, ev->x, ev->y);
             } else if (devdata->cur_context->type == GROMIT_RECTANGLE) {
-                /* draw_line (data, ev->device, devdata->start_x, devdata->start_y, ev->x, ev->y); */
+                // ADDED
+                snap_undo_state (data);
+                draw_line (data, ev->device, devdata->start_x, devdata->start_y, devdata->start_x, ev->y);
+                draw_line (data, ev->device, devdata->start_x, ev->y, ev->x, ev->y);
+                draw_line (data, ev->device, devdata->start_x, devdata->start_y, ev->x, devdata->start_y);
+                draw_line (data, ev->device, ev->x, devdata->start_y, ev->x, ev->y);
             } else {
                 draw_line (data, ev->device, devdata->lastx, devdata->lasty, ev->x, ev->y);
             }
@@ -379,6 +394,8 @@ gboolean on_motion (GtkWidget *win,
     devdata->lastx = ev->x;
     devdata->lasty = ev->y;
     devdata->motion_time = ev->time;
+
+    /* coord_list_free (data, ev->device); */
 
     return TRUE;
 }
@@ -392,7 +409,7 @@ gboolean on_buttonrelease (GtkWidget *win,
     /* get the device data for this event */
     GromitDeviceData *devdata = g_hash_table_lookup(data->devdatatable, ev->device);
 
-    gfloat direction = 0;
+    gfloat direction = 2;
     gint width = 0;
 
     if (devdata->cur_context)
