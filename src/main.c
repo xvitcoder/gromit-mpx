@@ -786,9 +786,6 @@ void setup_main_app (GromitData *data, int argc, char ** argv)
   GtkWidget* redo_item = gtk_menu_item_new_with_label (labelBuf);
 
   GtkWidget* sep_item = gtk_separator_menu_item_new();
-  GtkWidget* intro_item = gtk_menu_item_new_with_mnemonic(_("_Introduction"));
-  GtkWidget* support_item = gtk_menu_item_new_with_mnemonic(_("_Support Gromit-MPX"));
-  GtkWidget* about_item = gtk_menu_item_new_with_mnemonic(_("_About"));
   snprintf(labelBuf, sizeof(labelBuf), _("_Quit (ALT-%s)"), data->hot_keyval);
   GtkWidget* quit_item = gtk_menu_item_new_with_mnemonic(labelBuf);
 
@@ -805,9 +802,6 @@ void setup_main_app (GromitData *data, int argc, char ** argv)
   gtk_menu_shell_append (GTK_MENU_SHELL (menu), redo_item);
 
   gtk_menu_shell_append (GTK_MENU_SHELL (menu), sep_item);
-  gtk_menu_shell_append (GTK_MENU_SHELL (menu), intro_item);
-  gtk_menu_shell_append (GTK_MENU_SHELL (menu), support_item);
-  gtk_menu_shell_append (GTK_MENU_SHELL (menu), about_item);
   gtk_menu_shell_append (GTK_MENU_SHELL (menu), quit_item);
 
 
@@ -847,12 +841,6 @@ void setup_main_app (GromitData *data, int argc, char ** argv)
 		   G_CALLBACK (on_redo),
 		   data);
 
-  g_signal_connect(G_OBJECT (intro_item), "activate",
-		   G_CALLBACK (on_intro),
-		   data);
-  g_signal_connect(G_OBJECT (about_item), "activate",
-		   G_CALLBACK (on_about),
-		   NULL);
   g_signal_connect(G_OBJECT (quit_item), "activate",
 		   G_CALLBACK (gtk_main_quit),
 		   NULL);
@@ -870,45 +858,10 @@ void setup_main_app (GromitData *data, int argc, char ** argv)
   gtk_widget_show (redo_item);
 
   gtk_widget_show (sep_item);
-  gtk_widget_show (intro_item);
-  gtk_widget_show (support_item);
-  gtk_widget_show (about_item);
   gtk_widget_show (quit_item);
 
 
   app_indicator_set_menu (data->trayicon, GTK_MENU(menu));
-
-  /*
-    Build the support menu
-   */
-  GtkWidget *support_menu = gtk_menu_new ();
-  gtk_menu_item_set_submenu(GTK_MENU_ITEM(support_item), support_menu);
-
-  GtkWidget* support_liberapay_item = gtk_menu_item_new_with_label(_("Via LiberaPay"));
-  GtkWidget* support_patreon_item = gtk_menu_item_new_with_label(_("Via Patreon"));
-  GtkWidget* support_paypal_item = gtk_menu_item_new_with_label(_("Via PayPal"));
-
-  gtk_menu_shell_append (GTK_MENU_SHELL (support_menu), support_liberapay_item);
-  gtk_menu_shell_append (GTK_MENU_SHELL (support_menu), support_patreon_item);
-  gtk_menu_shell_append (GTK_MENU_SHELL (support_menu), support_paypal_item);
-
-  g_signal_connect(G_OBJECT (support_liberapay_item), "activate",
-		   G_CALLBACK (on_support_liberapay),
-		   data);
-  g_signal_connect(G_OBJECT (support_patreon_item), "activate",
-		   G_CALLBACK (on_support_patreon),
-		   data);
-  g_signal_connect(G_OBJECT (support_paypal_item), "activate",
-		   G_CALLBACK (on_support_paypal),
-		   data);
-
-  gtk_widget_show(support_liberapay_item);
-  gtk_widget_show(support_patreon_item);
-  gtk_widget_show(support_paypal_item);
-
-
-  if(data->show_intro_on_startup)
-      on_intro(NULL, data);
 }
 
 
