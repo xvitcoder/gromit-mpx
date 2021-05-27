@@ -463,8 +463,28 @@ void redo_drawing (GromitData *data)
     g_printerr("DEBUG: Redo drawing.\n");
 }
 
+void select_color (GromitData *data)
+{
+    if (data->color_dialog != NULL) {
+        return;
+    }
 
+	GdkRGBA	  color;
 
+    data->color_dialog = gtk_color_chooser_dialog_new("", data->win);
+
+    // Release all tool
+    release_grab (data, NULL);
+
+	if ((gtk_dialog_run(GTK_DIALOG(data->color_dialog))) == GTK_RESPONSE_OK)
+	{
+		gtk_color_chooser_get_rgba(GTK_COLOR_CHOOSER(data->color_dialog), data->selected_color);
+	}
+	gtk_widget_destroy(data->color_dialog);
+    data->color_dialog = NULL;
+
+    acquire_grab (data, NULL);
+}
 
 
 
@@ -473,14 +493,11 @@ void redo_drawing (GromitData *data)
  */
 
 
-void main_do_event (GdkEventAny *event,
-		    GromitData  *data)
+void main_do_event (GdkEventAny *event, GromitData  *data)
 {
   guint keycode = ((GdkEventKey *) event)->hardware_keycode;
-  if ((event->type == GDK_KEY_PRESS ||
-       event->type == GDK_KEY_RELEASE) &&
-      event->window == data->root &&
-      (keycode == data->hot_keycode || keycode == data->undo_keycode))
+  if ((event->type == GDK_KEY_PRESS || event->type == GDK_KEY_RELEASE) && event->window == data->root &&
+      (keycode == data->hot_keycode || keycode == data->undo_keycode || keycode == data->select_color_keycode))
     {
       /* redirect the event to our main window, so that GTK+ doesn't
        * throw it away (there is no GtkWidget for the root window...)
@@ -512,6 +529,8 @@ void setup_main_app (GromitData *data, int argc, char ** argv)
   bindtextdomain(PACKAGE_LOCALE_DOMAIN, PACKAGE_LOCALE_DIR);
   textdomain(PACKAGE_LOCALE_DOMAIN);
 
+  data->color_dialog = NULL;
+
   /*
     HOT KEYS
   */
@@ -521,28 +540,24 @@ void setup_main_app (GromitData *data, int argc, char ** argv)
   data->undo_keyval = DEFAULT_UNDOKEY;
   data->undo_keycode = 0;
 
-  char *xdg_current_desktop = getenv("XDG_CURRENT_DESKTOP");
-  if (xdg_current_desktop && strcmp(xdg_current_desktop, "XFCE") == 0) {
-      /*
-	XFCE per default grabs Ctrl-F1 to Ctrl-F12 (switch to workspace 1-12)
-	and Alt-F9 (minimize window) which renders Gromit-MPX's default hotkey
-	mapping unusable. Provide different defaults for that desktop environment.
-      */
-      data->hot_keyval = DEFAULT_HOTKEY_XFCE;
-      data->undo_keyval = DEFAULT_UNDOKEY_XFCE;
-      g_print("Detected XFCE, changing default hot keys to '" DEFAULT_HOTKEY_XFCE "' and '" DEFAULT_UNDOKEY_XFCE "'\n");
-  }
+  data->select_color_keyval = DEFAULT_SELECT_COLORKEY;
+  data->select_color_keycode = 0;
 
   /* COLOURS */
   g_free(data->white);
   g_free(data->black);
   g_free(data->red);
+  g_free(data->selected_color);
+
   data->white = g_malloc (sizeof (GdkRGBA));
   data->black = g_malloc (sizeof (GdkRGBA));
   data->red   = g_malloc (sizeof (GdkRGBA));
+  data->selected_color   = g_malloc (sizeof (GdkRGBA));
+
   gdk_rgba_parse(data->white, "#FFFFFF");
   gdk_rgba_parse(data->black, "#000000");
   gdk_rgba_parse(data->red, "#FF0000");
+  gdk_rgba_parse(data->selected_color, DEFAULT_COLOR);
 
 
   /* 
@@ -587,38 +602,24 @@ void setup_main_app (GromitData *data, int argc, char ** argv)
 
   /* EVENTS */
   gtk_widget_add_events (data->win, GROMIT_WINDOW_EVENTS);
-  g_signal_connect (data->win, "draw",
-		    G_CALLBACK (on_expose), data);
-  g_signal_connect (data->win,"configure_event",
-		    G_CALLBACK (on_configure), data);
-  g_signal_connect (data->win,"screen-changed",
-		    G_CALLBACK (on_screen_changed), data);
-  g_signal_connect (data->screen,"monitors_changed",
-		    G_CALLBACK (on_monitors_changed), data);
-  g_signal_connect (data->screen,"composited-changed",
-		    G_CALLBACK (on_composited_changed), data);
-  g_signal_connect (gdk_display_get_device_manager (data->display), "device-added",
-                    G_CALLBACK (on_device_added), data);
-  g_signal_connect (gdk_display_get_device_manager (data->display), "device-removed",
-                    G_CALLBACK (on_device_removed), data);
-  g_signal_connect (data->win, "motion_notify_event",
-		    G_CALLBACK (on_motion), data);
-  g_signal_connect (data->win, "button_press_event", 
-		    G_CALLBACK (on_buttonpress), data);
-  g_signal_connect (data->win, "button_release_event",
-		    G_CALLBACK (on_buttonrelease), data);
+  g_signal_connect (data->win, "draw", G_CALLBACK (on_expose), data);
+  g_signal_connect (data->win,"configure_event", G_CALLBACK (on_configure), data);
+  g_signal_connect (data->win,"screen-changed", G_CALLBACK (on_screen_changed), data);
+  g_signal_connect (data->screen,"monitors_changed", G_CALLBACK (on_monitors_changed), data);
+  g_signal_connect (data->screen,"composited-changed", G_CALLBACK (on_composited_changed), data);
+  g_signal_connect (gdk_display_get_device_manager (data->display), "device-added", G_CALLBACK (on_device_added), data);
+  g_signal_connect (gdk_display_get_device_manager (data->display), "device-removed", G_CALLBACK (on_device_removed), data);
+  g_signal_connect (data->win, "motion_notify_event", G_CALLBACK (on_motion), data);
+  g_signal_connect (data->win, "button_press_event", G_CALLBACK (on_buttonpress), data);
+  g_signal_connect (data->win, "button_release_event", G_CALLBACK (on_buttonrelease), data);
+
   /* disconnect previously defined selection handlers */
-  g_signal_handlers_disconnect_by_func (data->win, 
-					G_CALLBACK (on_clientapp_selection_get),
-					data);
-  g_signal_handlers_disconnect_by_func (data->win, 
-					G_CALLBACK (on_clientapp_selection_received),
-					data);
+  g_signal_handlers_disconnect_by_func (data->win, G_CALLBACK (on_clientapp_selection_get), data);
+  g_signal_handlers_disconnect_by_func (data->win, G_CALLBACK (on_clientapp_selection_received), data);
+
   /* and re-connect them to mainapp functions */
-  g_signal_connect (data->win, "selection_get",
-		    G_CALLBACK (on_mainapp_selection_get), data);
-  g_signal_connect (data->win, "selection_received",
-		    G_CALLBACK (on_mainapp_selection_received), data);
+  g_signal_connect (data->win, "selection_get", G_CALLBACK (on_mainapp_selection_get), data);
+  g_signal_connect (data->win, "selection_received", G_CALLBACK (on_mainapp_selection_received), data);
 
 
   if(!data->composited) // set initial shape
@@ -643,6 +644,7 @@ void setup_main_app (GromitData *data, int argc, char ** argv)
   gtk_selection_add_target (data->win, GA_CONTROL, GA_RELOAD, 7);
   gtk_selection_add_target (data->win, GA_CONTROL, GA_UNDO, 8);
   gtk_selection_add_target (data->win, GA_CONTROL, GA_REDO, 9);
+  gtk_selection_add_target (data->win, GA_CONTROL, GA_SELECT_COLOR, 10);
 
 
  
@@ -723,6 +725,34 @@ void setup_main_app (GromitData *data, int argc, char ** argv)
         }
     }
 
+  /*
+     FIND SELECT_COLORKEY KEYCODE 
+  */
+  if (data->select_color_keyval)
+    {
+      GdkKeymap    *keymap;
+      GdkKeymapKey *keys;
+      gint          n_keys;
+      guint         keyval;
+
+      if (strlen (data->select_color_keyval) > 0 &&
+          strcasecmp (data->select_color_keyval, "none") != 0)
+        {
+          keymap = gdk_keymap_get_for_display (data->display);
+          keyval = gdk_keyval_from_name (data->select_color_keyval);
+
+          if (!keyval || !gdk_keymap_get_entries_for_keyval (keymap, keyval,
+                                                             &keys, &n_keys))
+            {
+              g_printerr ("cannot find the key \"%s\"\n", data->select_color_keyval);
+              exit (1);
+            }
+
+          data->select_color_keycode = keys[0].keycode;
+          g_free (keys);
+        }
+    }
+
 
   /* 
      INPUT DEVICES
@@ -741,10 +771,8 @@ void setup_main_app (GromitData *data, int argc, char ** argv)
  
   data->modified = 0;
 
-  data->default_pen = paint_context_new (data, GROMIT_PEN,
-					 data->red, 7, 0, 1, G_MAXUINT);
-  data->default_eraser = paint_context_new (data, GROMIT_ERASER,
-					    data->red, 75, 0, 1, G_MAXUINT);
+  data->default_pen = paint_context_new (data, GROMIT_PEN, data->selected_color, 7, 0, 1, G_MAXUINT);
+  data->default_eraser = paint_context_new (data, GROMIT_ERASER, data->selected_color, 75, 0, 1, G_MAXUINT);
 
   
 
@@ -772,20 +800,30 @@ void setup_main_app (GromitData *data, int argc, char ** argv)
   /* Create the menu items */
   snprintf(labelBuf, sizeof(labelBuf), _("Toggle Painting (%s)"), data->hot_keyval);
   GtkWidget* toggle_paint_item = gtk_menu_item_new_with_label (labelBuf);
+
   snprintf(labelBuf, sizeof(labelBuf), _("Clear Screen (SHIFT-%s)"), data->hot_keyval);
   GtkWidget* clear_item = gtk_menu_item_new_with_label (labelBuf);
+
   snprintf(labelBuf, sizeof(labelBuf), _("Toggle Visibility (CTRL-%s)"), data->hot_keyval);
   GtkWidget* toggle_vis_item = gtk_menu_item_new_with_label (labelBuf);
+
   GtkWidget* thicker_lines_item = gtk_menu_item_new_with_label (_("Thicker Lines"));
   GtkWidget* thinner_lines_item = gtk_menu_item_new_with_label (_("Thinner Lines"));
   GtkWidget* opacity_bigger_item = gtk_menu_item_new_with_label (_("Bigger Opacity"));
   GtkWidget* opacity_lesser_item = gtk_menu_item_new_with_label (_("Lesser Opacity"));
+
   snprintf(labelBuf, sizeof(labelBuf), _("Undo (%s)"), data->undo_keyval);
   GtkWidget* undo_item = gtk_menu_item_new_with_label (labelBuf);
+
   snprintf(labelBuf, sizeof(labelBuf), _("Redo (SHIFT-%s)"), data->undo_keyval);
   GtkWidget* redo_item = gtk_menu_item_new_with_label (labelBuf);
 
+  snprintf(labelBuf, sizeof(labelBuf), _("Select Color (%s)"), data->select_color_keyval);
+  GtkWidget* select_color_item = gtk_menu_item_new_with_label (labelBuf);
+
+  // Separator
   GtkWidget* sep_item = gtk_separator_menu_item_new();
+
   snprintf(labelBuf, sizeof(labelBuf), _("_Quit (ALT-%s)"), data->hot_keyval);
   GtkWidget* quit_item = gtk_menu_item_new_with_mnemonic(labelBuf);
 
@@ -800,6 +838,7 @@ void setup_main_app (GromitData *data, int argc, char ** argv)
   gtk_menu_shell_append (GTK_MENU_SHELL (menu), opacity_lesser_item);
   gtk_menu_shell_append (GTK_MENU_SHELL (menu), undo_item);
   gtk_menu_shell_append (GTK_MENU_SHELL (menu), redo_item);
+  gtk_menu_shell_append (GTK_MENU_SHELL (menu), select_color_item);
 
   gtk_menu_shell_append (GTK_MENU_SHELL (menu), sep_item);
   gtk_menu_shell_append (GTK_MENU_SHELL (menu), quit_item);
@@ -809,41 +848,21 @@ void setup_main_app (GromitData *data, int argc, char ** argv)
   char *desktop = getenv("XDG_CURRENT_DESKTOP");
   if (desktop && strcmp(desktop, "KDE") == 0) {
       // KDE does not handle the device-specific "button-press-event" from a menu
-      g_signal_connect(G_OBJECT (toggle_paint_item), "activate",
-		       G_CALLBACK (on_toggle_paint_all),
-		       data);
+      g_signal_connect(G_OBJECT (toggle_paint_item), "activate", G_CALLBACK (on_toggle_paint_all), data);
   } else {
-      g_signal_connect(toggle_paint_item, "button-press-event",
-		       G_CALLBACK(on_toggle_paint), data);
+      g_signal_connect(toggle_paint_item, "button-press-event", G_CALLBACK(on_toggle_paint), data);
   }
-  g_signal_connect(G_OBJECT (clear_item), "activate",
-		   G_CALLBACK (on_clear),
-		   data);
-  g_signal_connect(G_OBJECT (toggle_vis_item), "activate",
-		   G_CALLBACK (on_toggle_vis),
-		   data);
-  g_signal_connect(G_OBJECT (thicker_lines_item), "activate",
-		   G_CALLBACK (on_thicker_lines),
-		   data);
-  g_signal_connect(G_OBJECT (thinner_lines_item), "activate",
-		   G_CALLBACK (on_thinner_lines),
-		   data);
-  g_signal_connect(G_OBJECT (opacity_bigger_item), "activate",
-		   G_CALLBACK (on_opacity_bigger),
-		   data);
-  g_signal_connect(G_OBJECT (opacity_lesser_item), "activate",
-		   G_CALLBACK (on_opacity_lesser),
-		   data);
-  g_signal_connect(G_OBJECT (undo_item), "activate",
-		   G_CALLBACK (on_undo),
-		   data);
-  g_signal_connect(G_OBJECT (redo_item), "activate",
-		   G_CALLBACK (on_redo),
-		   data);
+  g_signal_connect(G_OBJECT (clear_item), "activate", G_CALLBACK (on_clear), data);
+  g_signal_connect(G_OBJECT (toggle_vis_item), "activate", G_CALLBACK (on_toggle_vis), data);
+  g_signal_connect(G_OBJECT (thicker_lines_item), "activate", G_CALLBACK (on_thicker_lines), data);
+  g_signal_connect(G_OBJECT (thinner_lines_item), "activate", G_CALLBACK (on_thinner_lines), data);
+  g_signal_connect(G_OBJECT (opacity_bigger_item), "activate", G_CALLBACK (on_opacity_bigger), data);
+  g_signal_connect(G_OBJECT (opacity_lesser_item), "activate", G_CALLBACK (on_opacity_lesser), data);
+  g_signal_connect(G_OBJECT (undo_item), "activate", G_CALLBACK (on_undo), data);
+  g_signal_connect(G_OBJECT (redo_item), "activate", G_CALLBACK (on_redo), data);
+  g_signal_connect(G_OBJECT (select_color_item), "activate", G_CALLBACK (on_select_color), data);
 
-  g_signal_connect(G_OBJECT (quit_item), "activate",
-		   G_CALLBACK (gtk_main_quit),
-		   NULL);
+  g_signal_connect(G_OBJECT (quit_item), "activate", G_CALLBACK (gtk_main_quit), NULL);
 
 
   /* We do need to show menu items */
@@ -856,6 +875,7 @@ void setup_main_app (GromitData *data, int argc, char ** argv)
   gtk_widget_show (opacity_lesser_item);
   gtk_widget_show (undo_item);
   gtk_widget_show (redo_item);
+  gtk_widget_show (select_color_item);
 
   gtk_widget_show (sep_item);
   gtk_widget_show (quit_item);
@@ -957,6 +977,14 @@ int main_client (int argc, char **argv, GromitData *data)
    return 0;
 }
 
+void indicate_active(GromitData *data, gboolean YESNO)
+{
+    if(YESNO)
+	app_indicator_set_icon(data->trayicon, "net.christianbeier.Gromit-MPX.active");
+    else
+	app_indicator_set_icon(data->trayicon, "net.christianbeier.Gromit-MPX");
+}
+
 int main (int argc, char **argv)
 {
   GromitData *data;
@@ -985,6 +1013,7 @@ int main (int argc, char **argv)
     init our window
   */
   data->win = gtk_window_new (GTK_WINDOW_POPUP);
+
   // this trys to set an alpha channel
   on_screen_changed(data->win, NULL, data);
 
@@ -1000,11 +1029,10 @@ int main (int argc, char **argv)
 
   g_signal_connect (data->win, "delete-event", gtk_main_quit, NULL);
   g_signal_connect (data->win, "destroy", gtk_main_quit, NULL);
+
   /* the selection event handlers will be overwritten if we become a mainapp */
-  g_signal_connect (data->win, "selection_received", 
-		    G_CALLBACK (on_clientapp_selection_received), data);
-  g_signal_connect (data->win, "selection_get",
-		    G_CALLBACK (on_clientapp_selection_get), data);
+  g_signal_connect (data->win, "selection_received", G_CALLBACK (on_clientapp_selection_received), data);
+  g_signal_connect (data->win, "selection_get", G_CALLBACK (on_clientapp_selection_get), data);
   
   gtk_widget_realize (data->win);
 
@@ -1036,12 +1064,4 @@ int main (int argc, char **argv)
   write_keyfile(data); // save keyfile config
   g_free (data);
   return 0;
-}
-
-void indicate_active(GromitData *data, gboolean YESNO)
-{
-    if(YESNO)
-	app_indicator_set_icon(data->trayicon, "net.christianbeier.Gromit-MPX.active");
-    else
-	app_indicator_set_icon(data->trayicon, "net.christianbeier.Gromit-MPX");
 }

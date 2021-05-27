@@ -36,8 +36,8 @@
 #endif
 
 #define GROMIT_MOUSE_EVENTS ( GDK_BUTTON_MOTION_MASK | \
-                              GDK_BUTTON_PRESS_MASK | \
-                              GDK_BUTTON_RELEASE_MASK )
+        GDK_BUTTON_PRESS_MASK | \
+        GDK_BUTTON_RELEASE_MASK )
 
 #define GROMIT_WINDOW_EVENTS ( GROMIT_MOUSE_EVENTS | GDK_EXPOSURE_MASK)
 
@@ -53,6 +53,7 @@
 #define GA_RELOAD     gdk_atom_intern ("Gromit/reload", FALSE)
 #define GA_UNDO       gdk_atom_intern ("Gromit/undo", FALSE)
 #define GA_REDO       gdk_atom_intern ("Gromit/redo", FALSE)
+#define GA_SELECT_COLOR       gdk_atom_intern ("Gromit/selectcolor", FALSE)
 
 #define GA_DATA       gdk_atom_intern ("Gromit/data", FALSE)
 #define GA_TOGGLEDATA gdk_atom_intern ("Gromit/toggledata", FALSE)
@@ -61,92 +62,95 @@
 
 typedef enum
 {
-  GROMIT_PEN,
-  GROMIT_LINE,
-  GROMIT_RECTANGLE,
-  GROMIT_ERASER,
-  GROMIT_RECOLOR
+    GROMIT_PEN,
+    GROMIT_LINE,
+    GROMIT_RECTANGLE,
+    GROMIT_ERASER,
+    GROMIT_RECOLOR
 } GromitPaintType;
 
 typedef struct
 {
-  GromitPaintType type;
-  guint           width;
-  gfloat          arrowsize;
-  guint           minwidth;
-  guint           maxwidth;
-  GdkRGBA         *paint_color;
-  cairo_t         *paint_ctx;
-  gdouble         pressure;
+    GromitPaintType type;
+    guint           width;
+    gfloat          arrowsize;
+    guint           minwidth;
+    guint           maxwidth;
+    GdkRGBA         *paint_color;
+    cairo_t         *paint_ctx;
+    gdouble         pressure;
 } GromitPaintContext;
 
 typedef struct
 {
-  gint         start_x;
-  gint         start_y;
-  gdouble      lastx;
-  gdouble      lasty;
-  guint32      motion_time;
-  GList*       coordlist;
-  GdkDevice*   device;
-  guint        index;
-  guint        state;
-  GromitPaintContext *cur_context;
-  gboolean     is_grabbed;
-  gboolean     was_grabbed;
-  GdkDevice*   lastslave;
+    gint         start_x;
+    gint         start_y;
+    gdouble      lastx;
+    gdouble      lasty;
+    guint32      motion_time;
+    GList*       coordlist;
+    GdkDevice*   device;
+    guint        index;
+    guint        state;
+    GromitPaintContext *cur_context;
+    gboolean     is_grabbed;
+    gboolean     was_grabbed;
+    GdkDevice*   lastslave;
 } GromitDeviceData;
 
 
 typedef struct
 {
-  GtkWidget   *win;
-  AppIndicator *trayicon;
+    GtkWidget   *win;
+    GtkWidget   *color_dialog;
+    AppIndicator *trayicon;
 
-  GdkCursor   *paint_cursor;
-  GdkCursor   *erase_cursor;
+    GdkCursor   *paint_cursor;
+    GdkCursor   *erase_cursor;
 
-  GdkDisplay  *display;
-  GdkScreen   *screen;
-  gboolean     xinerama;
-  gboolean     composited;
-  GdkWindow   *root;
-  gchar       *hot_keyval;
-  guint        hot_keycode;
-  gchar       *undo_keyval;
-  guint        undo_keycode;
-  gdouble      opacity;
+    GdkDisplay  *display;
+    GdkScreen   *screen;
+    gboolean     xinerama;
+    gboolean     composited;
+    GdkWindow   *root;
+    gchar       *hot_keyval;
+    guint        hot_keycode;
+    gchar       *undo_keyval;
+    guint        undo_keycode;
+    gchar       *select_color_keyval;
+    guint        select_color_keycode;
+    gdouble      opacity;
 
-  GdkRGBA     *white;
-  GdkRGBA     *black;
-  GdkRGBA     *red;
+    GdkRGBA     *selected_color;
 
-  GromitPaintContext *default_pen;
-  GromitPaintContext *default_eraser;
- 
-  GHashTable  *tool_config;
+    GdkRGBA     *white;
+    GdkRGBA     *black;
+    GdkRGBA     *red;
 
-  cairo_surface_t *backbuffer;
+    GromitPaintContext *default_pen;
+    GromitPaintContext *default_eraser;
 
-  GHashTable  *devdatatable;
+    GHashTable  *tool_config;
 
-  guint        timeout_id;
-  guint        modified;
-  guint        delayed;
-  guint        maxwidth;
-  guint        width;
-  guint        height;
-  guint        client;
-  guint        painted;
-  gboolean     hidden;
-  gboolean     debug;
+    cairo_surface_t *backbuffer;
 
-  gchar       *clientdata;
+    GHashTable  *devdatatable;
 
-  cairo_surface_t *undobuffer[GROMIT_MAX_UNDO];
-  gint            undo_head, undo_depth, redo_depth;
+    guint        timeout_id;
+    guint        modified;
+    guint        delayed;
+    guint        maxwidth;
+    guint        width;
+    guint        height;
+    guint        client;
+    guint        painted;
+    gboolean     hidden;
+    gboolean     debug;
 
-  gboolean show_intro_on_startup;
+    gchar       *clientdata;
+
+    cairo_surface_t *undobuffer[GROMIT_MAX_UNDO];
+    gint            undo_head, undo_depth, redo_depth;
 
 } GromitData;
 
@@ -165,11 +169,13 @@ void snap_undo_state (GromitData *data);
 void undo_drawing (GromitData *data);
 void redo_drawing (GromitData *data);
 
+void select_color (GromitData *data);
+
 void clear_screen (GromitData *data);
 
 GromitPaintContext *paint_context_new (GromitData *data, GromitPaintType type,
-				       GdkRGBA *fg_color, guint width, guint arrowsize,
-                                       guint minwidth, guint maxwidth);
+        GdkRGBA *fg_color, guint width, guint arrowsize,
+        guint minwidth, guint maxwidth);
 void paint_context_free (GromitPaintContext *context);
 
 void indicate_active(GromitData *data, gboolean YESNO);

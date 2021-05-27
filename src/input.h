@@ -12,4 +12,6 @@ void acquire_grab (GromitData *data, GdkDevice *dev);
 void toggle_grab  (GromitData *data, GdkDevice *dev);
 gint snoop_key_press (GtkWidget *grab_widget, GdkEventKey *event, gpointer func_data);
 
+gboolean get_are_all_grabbed(GromitData *data);
+gboolean get_are_some_grabbed(GromitData *data);
 #endif

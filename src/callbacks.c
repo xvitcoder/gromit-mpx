@@ -129,9 +129,9 @@ void on_monitors_changed ( GdkScreen *screen,
 
 
     data->default_pen = paint_context_new (data, GROMIT_PEN,
-            data->red, 7, 0, 1, G_MAXUINT);
+            data->selected_color, 7, 0, 1, G_MAXUINT);
     data->default_eraser = paint_context_new (data, GROMIT_ERASER,
-            data->red, 75, 0, 1, G_MAXUINT);
+            data->selected_color, 75, 0, 1, G_MAXUINT);
 
     if(!data->composited) // set shape
     {
@@ -658,4 +658,11 @@ void on_redo(GtkMenuItem *menuitem,
 {
     GromitData *data = (GromitData *) user_data;
     redo_drawing (data);
+}
+
+void on_select_color(GtkMenuItem *menuitem,
+        gpointer     user_data)
+{
+    GromitData *data = (GromitData *) user_data;
+    select_color (data);
 }
